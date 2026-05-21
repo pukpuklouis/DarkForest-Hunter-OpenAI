@@ -1403,12 +1403,7 @@ class ScannerEngine:
         for pc in PROVIDER_CONFIGS:
             if pc["name"] in self.providers:
                 active.append(pc)
-        if not active and "deepseek" in PROVIDER_CONFIGS[0]["name"]:
-            # fallback: if named providers not found, use first configured
-            for pc in PROVIDER_CONFIGS:
-                if pc["name"] in self.providers:
-                    active.append(pc)
-        return active or [PROVIDER_CONFIGS[0]]
+        return active or [PROVIDER_CONFIGS[0]]  # fallback: default to first provider
 
     async def _try_provider_endpoint(self, session: aiohttp.ClientSession,
                                      api_key: str, provider: dict) -> dict:
@@ -1422,7 +1417,13 @@ class ScannerEngine:
                                     timeout=aiohttp.ClientTimeout(total=self.timeout)) as resp:
                 if resp.status == 200:
                     data = await resp.json()
-                    return self._parse_provider_response(name, data)
+                    result = self._parse_provider_response(name, data)
+                    # For OpenAI: try credit_grants to get actual balance
+                    if name == "openai" and provider.get("credit_url"):
+                        balance = await self._try_openai_credits(session, api_key, provider)
+                        if balance is not None:
+                            result.update(balance)
+                    return result
                 elif resp.status == 401:
                     return {"valid": False, "reason": f"{name}:invalid_key"}
                 elif resp.status == 429:
@@ -1434,6 +1435,27 @@ class ScannerEngine:
             return {"valid": False, "reason": f"{name}:timeout"}
         except Exception as e:
             return {"valid": False, "reason": f"{name}:{str(e)[:60]}"}
+
+    async def _try_openai_credits(self, session: aiohttp.ClientSession,
+                                   api_key: str, provider: dict):
+        """Try OpenAI credit_grants endpoint to get actual balance.
+        Returns balance dict or None if endpoint is unavailable."""
+        url = f"{provider['base']}{provider['credit_url']}"
+        headers = {"Authorization": f"Bearer {api_key}"}
+        try:
+            async with session.get(url, headers=headers,
+                                    timeout=aiohttp.ClientTimeout(total=8)) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    parsed = _parse_openai_credits(data)
+                    return {"total_balance": parsed["total_balance"],
+                            "primary_currency": parsed["primary_currency"],
+                            "openai_grants": parsed.get("openai_grants"),
+                            "balance_unavailable": False,
+                            "provider_note": ""}
+        except Exception:
+            pass
+        return None
 
     def _parse_provider_response(self, provider_name: str, data: dict) -> dict:
         """Parse balance response based on provider name."""
@@ -1457,17 +1479,15 @@ class ScannerEngine:
         """
         async with semaphore:
             active = self._get_active_providers()
-            last_reason = None
+            last_result = None
             for provider in active:
                 result = await self._try_provider_endpoint(session, api_key, provider)
                 if result.get("valid"):
                     return result
-                # Track last non-rate-limit reason
-                if "rate_limited" not in result.get("reason", ""):
-                    last_reason = result.get("reason", "")
-            # All providers failed — return last meaningful reason
-            if last_reason:
-                return {"valid": False, "reason": last_reason}
+                last_result = result
+            # All providers failed — return last result
+            if last_result:
+                return last_result
             return {"valid": False, "reason": "no_provider_match"}
 
     async def _verify_all_async(self, all_keys: dict) -> list:
