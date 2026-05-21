@@ -1,0 +1,1164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeepSeek Key Hunter — CLI 命令生成器</title>
+<style>
+  :root {
+    --bg: #0b0e14;
+    --surface: #131720;
+    --surface2: #1a1f2b;
+    --border: #252b36;
+    --border-focus: #3b4a63;
+    --text: #cdd6e0;
+    --text-dim: #6b7385;
+    --text-bright: #e8ecf2;
+    --accent: #4d94ff;
+    --accent-dim: rgba(77,148,255,0.12);
+    --green: #3fb950;
+    --green-dim: rgba(63,185,80,0.12);
+    --orange: #e3a72f;
+    --orange-dim: rgba(227,167,47,0.12);
+    --red: #f85149;
+    --red-dim: rgba(248,81,73,0.1);
+    --purple: #a371f7;
+    --radius: 10px;
+    --radius-sm: 6px;
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+    --mono: 'Cascadia Code', 'JetBrains Mono', 'Fira Code', 'Consolas', 'SF Mono', monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 80px; }
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+  }
+
+  /* ── Layout Container ── */
+  .app {
+    width: 100%;
+    max-width: 860px;
+    padding: 0 24px 200px;
+  }
+
+  /* ── Header ── */
+  .header {
+    padding: 40px 0 24px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 32px;
+  }
+  .header h1 {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .header h1 span { font-size: 28px; }
+  .header .desc {
+    margin-top: 6px;
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+  .header .tags {
+    margin-top: 10px;
+    display: flex; gap: 8px; flex-wrap: wrap;
+  }
+  .header .tags span {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+  }
+  .header .tags span.hl { color: var(--accent); border-color: rgba(77,148,255,0.25); background: var(--accent-dim); }
+
+  /* ── Section ── */
+  .section {
+    margin-bottom: 36px;
+  }
+  .section-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-bright);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-title .icon { font-size: 16px; width: 22px; text-align: center; }
+  .section-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  /* ── Form Row ── */
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .form-row.col3 { grid-template-columns: 1fr 1fr 1fr; }
+  .form-row.span2 { grid-template-columns: 2fr 1fr; }
+  @media (max-width: 640px) {
+    .form-row, .form-row.col3, .form-row.span2 { grid-template-columns: 1fr; }
+  }
+
+  /* ── Form Field ── */
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .field label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .field label .badge {
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: none;
+    padding: 1px 6px;
+    border-radius: 8px;
+    letter-spacing: 0;
+  }
+  .badge.req { background: var(--red-dim); color: var(--red); }
+  .badge.opt { background: var(--surface2); color: var(--text-dim); border: 1px solid var(--border); }
+
+  .field input[type="text"],
+  .field input[type="number"],
+  .field input[type="search"],
+  .field select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 9px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-family: var(--mono);
+    outline: none;
+    transition: all .15s;
+  }
+  .field input:focus, .field select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-dim);
+  }
+  .field select { cursor: pointer; font-family: var(--font); }
+  .field .help {
+    font-size: 11px; color: var(--text-dim);
+    display: flex; align-items: center; gap: 4px;
+  }
+  .field .help code {
+    background: var(--surface2);
+    padding: 1px 5px; border-radius: 3px;
+    font-family: var(--mono); font-size: 10px;
+  }
+  .field .help .warn { color: var(--orange); font-weight: 500; }
+
+  /* ── Chips (checkbox) ── */
+  .chip-row {
+    display: flex; flex-wrap: wrap; gap: 8px;
+  }
+  .chip {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 7px 14px;
+    background: var(--bg);
+    border: 1.5px solid var(--border);
+    border-radius: 20px;
+    font-size: 12px; font-weight: 500;
+    cursor: pointer;
+    transition: all .15s;
+    user-select: none;
+    white-space: nowrap;
+  }
+  .chip:hover { border-color: var(--border-focus); background: var(--surface2); }
+  .chip input { display: none; }
+  .chip .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--border); transition: all .15s;
+  }
+  .chip.on { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+  .chip.on .dot { background: var(--accent); box-shadow: 0 0 5px var(--accent); }
+  .chip.on-danger { border-color: var(--red); color: var(--red); background: var(--red-dim); }
+  .chip.on-danger .dot { background: var(--red); box-shadow: 0 0 5px var(--red); }
+  .chip.on-green { border-color: var(--green); color: var(--green); background: var(--green-dim); }
+  .chip.on-green .dot { background: var(--green); box-shadow: 0 0 5px var(--green); }
+  .chip .emoji { font-size: 14px; }
+
+  /* ── Radio Chips ── */
+  .radio-row { display: flex; gap: 0; }
+  .radio-chip {
+    padding: 7px 18px;
+    background: var(--bg);
+    border: 1.5px solid var(--border);
+    font-size: 12px; font-weight: 500;
+    cursor: pointer; user-select: none;
+    transition: all .15s;
+    margin-right: -1px;
+  }
+  .radio-chip:first-of-type { border-radius: 20px 0 0 20px; }
+  .radio-chip:last-of-type { border-radius: 0 20px 20px 0; }
+  .radio-chip input { display: none; }
+  .radio-chip:hover { border-color: var(--border-focus); background: var(--surface2); }
+  .radio-chip.on { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); z-index: 1; }
+
+  /* ── Token Panel ── */
+  .token-panel {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    display: flex; align-items: flex-start; gap: 16px;
+    flex-wrap: wrap;
+  }
+  .token-left { flex: 1; min-width: 200px; }
+  .token-right {
+    display: flex; flex-direction: column; gap: 8px;
+    align-items: center; min-width: 100px;
+  }
+  .token-status {
+    font-size: 12px; padding: 4px 12px; border-radius: 12px;
+    text-align: center;
+  }
+  .token-status.found { color: var(--green); background: var(--green-dim); }
+  .token-status.missing { color: var(--orange); background: var(--orange-dim); }
+
+  .divider {
+    border: none; border-top: 1px solid var(--border);
+    margin: 6px 0;
+  }
+
+  /* ── Note Card ── */
+  .note {
+    font-size: 12px; color: var(--text-dim);
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 10px 14px;
+    display: flex; align-items: flex-start; gap: 8px;
+    line-height: 1.6;
+  }
+  .note strong { color: var(--text-bright); }
+
+  /* ── Command Preview Bar ── */
+  .cmd-preview {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 16px 24px;
+    z-index: 100;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.4);
+  }
+  .cmd-preview-inner {
+    max-width: 860px;
+    margin: 0 auto;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .cmd-preview-header {
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .cmd-preview-header span {
+    font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    color: var(--text-dim);
+  }
+  .cmd-preview-header .btn-group { display: flex; gap: 6px; }
+
+  .btn {
+    font-size: 12px; font-weight: 500;
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    color: var(--text);
+    cursor: pointer;
+    transition: all .15s;
+    font-family: var(--font);
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .btn:hover { border-color: var(--border-focus); background: var(--surface2); }
+  .btn.accent { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  .btn.accent:hover { filter: brightness(1.15); }
+  .btn.green { border-color: var(--green); color: var(--green); }
+  .btn.green:hover { background: var(--green-dim); }
+  .btn.red { border-color: var(--red); color: var(--red); }
+  .btn.red:hover { background: var(--red-dim); }
+
+  pre.cmd-box {
+    background: #0a0c10;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px 18px;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--green);
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    line-height: 1.8;
+    max-height: 100px;
+    overflow-y: auto;
+  }
+  .cmd-box .kw { color: var(--green); font-weight: 600; }
+  .cmd-box .fl { color: var(--accent); }
+  .cmd-box .vl { color: var(--orange); }
+  .cmd-box .cm { color: var(--text-dim); }
+
+  /* ── Toast ── */
+  .toast {
+    position: fixed; top: 24px; left: 50%; transform: translateX(-50%);
+    background: var(--green); color: #000;
+    padding: 10px 24px; border-radius: 24px;
+    font-size: 13px; font-weight: 600;
+    opacity: 0; pointer-events: none;
+    transition: all .25s;
+    z-index: 200;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(4px); }
+  .toast.err { background: var(--red); color: #fff; }
+
+  /* ── Nav dots ── */
+  .nav-dots {
+    position: fixed; right: 20px; top: 50%; transform: translateY(-50%);
+    display: flex; flex-direction: column; gap: 10px; z-index: 50;
+  }
+  .nav-dots a {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--border); transition: all .2s;
+    display: block; text-decoration: none;
+  }
+  .nav-dots a:hover, .nav-dots a.active { background: var(--accent); }
+  @media (max-width: 900px) { .nav-dots { display: none; } }
+</style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+
+<nav class="nav-dots" id="nav-dots"></nav>
+
+<main class="app">
+
+  <!-- ── Header ── -->
+  <div class="header">
+    <h1><span>&#128269;</span>CLI 命令生成器</h1>
+    <div class="desc">DeepSeek Key Hunter v4.0 — 可视化构建命令行参数，一键生成可执行命令</div>
+    <div class="tags">
+      <span class="hl">67 核心查询</span>
+      <span>异步验证</span>
+      <span>USD/CNY 换算</span>
+      <span>断点续跑</span>
+      <span>多源扫描</span>
+    </div>
+  </div>
+
+  <!-- ── 1. GitHub Token ── -->
+  <div class="section" id="sec-token">
+    <div class="section-title"><span class="icon">&#128273;</span>GitHub API 认证</div>
+    <div class="section-card">
+      <div class="token-panel">
+        <div class="token-left">
+          <div class="field">
+            <label>GitHub Personal Access Token <span class="badge opt">可选</span></label>
+            <input type="text" id="token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx 或多 Token 用逗号分隔" autocomplete="off">
+            <span class="help"><code>ghp_xxx</code> 或 <code>github_pat_xxx</code> — 提升 API 限额从 10次/分 → 30次/分</span>
+          </div>
+        </div>
+        <div class="token-right">
+          <div class="token-status missing" id="token-status">未检测到</div>
+          <button class="btn red" id="btn-clear-token" style="font-size:11px" onclick="document.getElementById('token').value=''; generate();">清除</button>
+        </div>
+      </div>
+      <div class="note">
+        <span>&#128161;</span>
+        <span>
+          <strong>用法：</strong>
+          可直接粘贴 Token，多个 Token 用逗号分隔实现轮换。<br>
+          或设置环境变量 <code>GITHUB_TOKEN</code>（无需在此填写，脚本自动读取）。<br>
+          获取 Token：<a href="https://github.com/settings/tokens" target="_blank" style="color:var(--accent)">github.com/settings/tokens</a>（仅需 public_repo 权限）。
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 2. Search ── -->
+  <div class="section" id="sec-search">
+    <div class="section-title"><span class="icon">&#128270;</span>搜索配置</div>
+    <div class="section-card">
+      <div class="chip-row">
+        <label class="chip on-green" id="chip-builtin">
+          <span class="emoji">&#9989;</span>
+          <span class="dot"></span> 使用内置查询 (67条)
+          <input type="checkbox" id="use-builtin" checked>
+        </label>
+        <label class="chip" id="chip-skip">
+          <span class="dot"></span> 跳过内置查询
+          <input type="checkbox" id="skip-builtin">
+        </label>
+      </div>
+      <div class="form-row">
+        <div class="field">
+          <label>自定义查询文件 <span class="badge opt">可选</span></label>
+          <input type="text" id="queries-file" placeholder="queries_v4.txt">
+          <span class="help">每行一个 GitHub 搜索查询，<code>#</code> 开头为注释</span>
+        </div>
+        <div class="field">
+          <label>请求间隔 <span class="badge opt">默认 2.5s</span></label>
+          <input type="number" id="search-delay" value="2.5" step="0.1" min="0.5" max="30">
+          <span class="help">每查询翻页数 (1-10), 每页100条。5页=500条/查询。已认证30次/分钟, 未认证10次/分钟。间隔 <code>2.5s</code>/<code>6.5s</code> 自动调整</span>
+        </div>
+      </div>
+      <div class="note">
+        <span>&#128218;</span>
+        <span><strong>搜索逻辑：</strong>内置查询覆盖 75 种模式（Python直写、Dart/Flutter、C++、Kotlin、Swift、PHP、.env、Dockerfile、CI/CD 等）。跳过内置查询后可使用完全自定义的查询文件。</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 2b. Multi-Source Scan ── -->
+  <div class="section" id="sec-multi">
+    <div class="section-title"><span class="icon">&#127760;</span>多源扫描 (新增)</div>
+    <div class="section-card">
+      <div class="chip-row">
+        <label class="chip" id="chip-src-github">
+          <span class="dot"></span> GitHub 代码
+          <input type="checkbox" id="source-github" checked>
+        </label>
+        <label class="chip" id="chip-src-gist">
+          <span class="dot"></span> Gist
+          <input type="checkbox" id="source-gist">
+        </label>
+        <label class="chip" id="chip-src-issues">
+          <span class="dot"></span> Issues/PRs
+          <input type="checkbox" id="source-issues">
+        </label>
+        <label class="chip" id="chip-src-gitlab">
+          <span class="dot"></span> GitLab
+          <input type="checkbox" id="source-gitlab">
+        </label>
+        <label class="chip" id="chip-src-wayback">
+          <span class="dot"></span> Wayback
+          <input type="checkbox" id="source-wayback">
+        </label>
+        <label class="chip" id="chip-src-docker">
+          <span class="dot"></span> Docker Hub
+          <input type="checkbox" id="source-docker">
+        </label>
+        <label class="chip" id="chip-src-cc">
+          <span class="dot"></span> Common Crawl
+          <input type="checkbox" id="source-commoncrawl">
+        </label>
+        <label class="chip" id="chip-src-gitee">
+          <span class="dot"></span> Gitee 码云
+          <input type="checkbox" id="source-gitee">
+        </label>
+        <label class="chip" id="chip-src-npm">
+          <span class="dot"></span> npm
+          <input type="checkbox" id="source-npm">
+        </label>
+        <label class="chip" id="chip-src-all">
+          <span class="dot"></span> 🔥 全部
+          <input type="checkbox" id="source-all">
+        </label>
+      </div>
+      <div class="form-row">
+        <div class="field">
+          <label>GitHub Token <span class="badge opt">可选</span></label>
+          <input type="text" id="github-token" placeholder="ghp_xxx 或 github_pat_xxx">
+        </div>
+        <div class="field">
+          <label>GitLab Token <span class="badge opt">可选</span></label>
+          <input type="text" id="gitlab-token" placeholder="glpat-xxx">
+        </div>
+        <div class="field">
+          <label>Gitee Token <span class="badge opt">可选</span></label>
+          <input type="text" id="gitee-token" placeholder="Gitee Access Token">
+        </div>
+      </div>
+      <div class="note">
+        <span>&#127760;</span>
+        <span><strong>多源扫描：</strong>同时扫描多个平台，每源独立运行并去重。全选 (<code>all</code>) 覆盖 GitHub + Gist + GitLab + Docker + Common Crawl + Gitee + npm 共 8 个来源。</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 3. Verification ── -->
+  <div class="section" id="sec-verify">
+    <div class="section-title"><span class="icon">&#9889;</span>验证与运行模式</div>
+    <div class="section-card">
+      <div class="form-row">
+        <div class="field">
+          <label>并发验证数 <span class="badge opt">默认 20</span></label>
+          <input type="number" id="concurrency" value="20" min="1" max="100">
+          <span class="help">同时验证的 Key 数量，推荐 20~30；过高可能触发 DeepSeek 限流</span>
+        </div>
+        <div class="field">
+          <label>HTTP 超时 (秒) <span class="badge opt">默认 15</span></label>
+          <input type="number" id="timeout" value="15" min="5" max="120">
+          <span class="help">网络超时时间，网络不稳定可适当增大</span>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="chip-row">
+        <label class="chip" id="chip-fullscan">
+          <span class="dot"></span> &#128269; 全流程扫描 (搜索+验证+保存)
+          <input type="radio" name="run-mode" value="full" checked>
+        </label>
+        <label class="chip" id="chip-dryrun">
+          <span class="dot"></span> &#128083; 仅搜索不验证 (--dry-run)
+          <input type="radio" name="run-mode" value="dry-run">
+        </label>
+        <label class="chip" id="chip-verifyonly">
+          <span class="dot"></span> &#9989; 仅验证已有结果 (--verify-only)
+          <input type="radio" name="run-mode" value="verify-only">
+        </label>
+        <label class="chip" id="chip-resume">
+          <span class="dot"></span> &#128260; 断点续跑 (--resume)
+          <input type="radio" name="run-mode" value="resume">
+        </label>
+      </div>
+      <div class="field" id="verify-only-field" style="display:none">
+        <label>验证文件路径 <span class="badge req">必填</span></label>
+        <input type="text" id="verify-only" placeholder="results/deepseek_keys_result.json 或 .dkh_progress.json">
+        <span class="help">支持 JSON 结果文件或进度文件，自动识别格式</span>
+      </div>
+      <div class="note" id="mode-note">
+        <span>&#128269;</span><span><strong>全流程扫描：</strong>搜索 GitHub 公开仓库 → 提取疑似 Key → 并发验证余额 → 按 USD 价值排序保存。这是默认且推荐的模式。</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 4. Key Filtering ── -->
+  <div class="section" id="sec-filter">
+    <div class="section-title"><span class="icon">&#128203;</span>Key 过滤规则</div>
+    <div class="section-card">
+      <div class="form-row">
+        <div class="field">
+          <label>最短长度 <span class="badge opt">32</span></label>
+          <input type="number" id="min-key-length" value="32" min="16" max="128">
+          <span class="help">DeepSeek Key 通常 35~51 字符</span>
+        </div>
+        <div class="field">
+          <label>最长长度 <span class="badge opt">64</span></label>
+          <input type="number" id="max-key-length" value="64" min="32" max="256">
+          <span class="help">超过此长度的字符串不会被识别为 Key</span>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="field">
+          <label>最低余额过滤 (USD) <span class="badge opt">0.00=全部</span></label>
+          <input type="number" id="min-balance" value="0.00" step="0.01" min="0">
+          <span class="help">只保存 USD 等值余额 ≥ 此值的 Key；设为 0 保留全部</span>
+        </div>
+        <div class="field">
+          <label>排除仓库 (逗号分隔) <span class="badge opt">可选</span></label>
+          <input type="text" id="exclude-repo" placeholder="praetorian-inc/*, *test*, user/repo">
+          <span class="help">支持 <code>*</code> 通配符，例：<code>praetorian-inc/*</code> 排除整个组织</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 5. Output ── -->
+  <div class="section" id="sec-output">
+    <div class="section-title"><span class="icon">&#128196;</span>输出设置</div>
+    <div class="section-card">
+      <div class="form-row">
+        <div class="field">
+          <label>输出目录 <span class="badge opt">./results</span></label>
+          <input type="text" id="output-dir" value="./results">
+          <span class="help">结果文件保存目录，会自动创建</span>
+        </div>
+        <div class="field">
+          <label>输出格式</label>
+          <div class="radio-row">
+            <label class="radio-chip on" data-value="all">
+              <input type="radio" name="format" value="all" checked> 全部
+            </label>
+            <label class="radio-chip" data-value="json">
+              <input type="radio" name="format" value="json"> JSON
+            </label>
+            <label class="radio-chip" data-value="csv">
+              <input type="radio" name="format" value="csv"> CSV
+            </label>
+            <label class="radio-chip" data-value="markdown">
+              <input type="radio" name="format" value="markdown"> MD
+            </label>
+          </div>
+          <span class="help">全部 = JSON + CSV + Markdown，MD 适合直接贴到 SRC 报告</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 6. Exchange Rate ── -->
+  <div class="section" id="sec-rate">
+    <div class="section-title"><span class="icon">&#128176;</span>汇率与货币</div>
+    <div class="section-card">
+      <div class="form-row span2">
+        <div class="field">
+          <label>USD / CNY 汇率 <span class="badge opt">默认 7.25</span></label>
+          <input type="number" id="usd-cny-rate" value="7.25" step="0.01" min="1" max="20">
+          <span class="help">
+            DeepSeek 余额接口返回 USD 或 CNY，脚本自动换算后按实际价值排序。
+            当前汇率下：¥100 CNY ≈ $13.79 USD
+          </span>
+        </div>
+        <div class="field" style="justify-content:flex-end">
+          <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;font-size:12px;font-family:var(--mono);">
+            <div>&#127482;&#127480; $1.00 USD</div>
+            <div style="color:var(--text-dim);margin:4px 0">=</div>
+            <div>&#127464;&#127475; ¥<span id="rate-display">7.25</span> CNY</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 7. Exit Mechanism ── -->
+  <div class="section" id="sec-stop">
+    <div class="section-title"><span class="icon">&#9208;</span>自动退出机制</div>
+    <div class="section-card">
+      <div class="form-row">
+        <div class="field">
+          <label>最大运行时长 (秒) <span class="badge opt">0=不限</span></label>
+          <input type="number" id="max-duration" value="0" min="0" step="60">
+          <span class="help">设置后程序运行超时将自动保存并退出。例：<code>600</code> = 10 分钟</span>
+        </div>
+        <div class="field">
+          <label>收集有效 Key 数量上限 <span class="badge opt">0=不限</span></label>
+          <input type="number" id="max-valid-keys" value="0" min="0">
+          <span class="help">搜索到指定数量的有效 Key 后自动保存退出。如 <code>50</code></span>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="field">
+          <label>实时保存间隔 <span class="badge opt">默认 20</span></label>
+          <input type="number" id="auto-save-interval" value="20" min="5" max="200">
+          <span class="help">每验证 N 个 Key 自动保存一次结果，防止意外中断丢失数据</span>
+        </div>
+        <div class="field" style="justify-content:flex-end">
+          <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;font-size:12px;">
+            <div style="color:var(--text-dim);margin-bottom:4px">&#128161; 自动退出规则</div>
+            <div style="font-family:var(--mono);font-size:11px;color:var(--accent);line-height:1.6">
+              1. 时间优先：超时立即停止<br>
+              2. 数量优先：达到目标即停止<br>
+              3. 实时保存：中断不丢数据
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 8. GUI / Advanced ── -->
+  <div class="section" id="sec-adv">
+    <div class="section-title"><span class="icon">&#128640;</span>高级与界面</div>
+    <div class="section-card">
+      <div class="chip-row">
+        <label class="chip" id="chip-quiet">
+          <span class="dot"></span> &#128264; 安静模式 (-q)
+          <input type="checkbox" id="quiet">
+        </label>
+        <label class="chip" id="chip-cmdgen">
+          <span class="dot"></span> &#127760; 打开命令生成器 (--cmd-gen)
+          <input type="checkbox" id="cmd-gen">
+        </label>
+      </div>
+      <div class="field">
+        <label>自定义附加参数 <span class="badge opt">可选</span></label>
+        <input type="text" id="extra-args" placeholder="--some-flag --other value">
+        <span class="help">自由的额外 CLI 参数，直接拼接到命令末尾</span>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ── Command Preview (sticky bottom) ── -->
+<div class="cmd-preview" id="cmd-preview">
+  <div class="cmd-preview-inner">
+    <div class="cmd-preview-header">
+      <span>&#9889; 实时生成的命令 (参数变动即时更新)</span>
+      <div class="btn-group">
+        <button class="btn red" onclick="resetAll()">&#8634; 全部重置</button>
+        <button class="btn green" onclick="copyCmd()">&#128203; 复制到剪贴板</button>
+        <button class="btn accent" onclick="downloadCmd()">&#128190; 保存为 .bat</button>
+      </div>
+    </div>
+    <pre class="cmd-box" id="cmd-box"></pre>
+  </div>
+</div>
+
+<script>
+'use strict';
+// ═══════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════
+
+const DEFAULTS = {
+  token: '', concurrency: 20, timeout: 15, 'search-delay': 2.5, 'scan-pages': 5,
+  'queries-file': '', 'skip-builtin': false, 'use-builtin': true,
+  'min-key-length': 32, 'max-key-length': 64, 'min-balance': 0,
+  'exclude-repo': '', 'usd-cny-rate': 7.25, 'output-dir': './results',
+  format: 'all', 'run-mode': 'full', quiet: false,
+  'verify-only': '', 'cmd-gen': false,
+  'extra-args': '',
+  'max-duration': 0, 'max-valid-keys': 0, 'auto-save-interval': 20,
+  'source-github': true, 'source-gist': false, 'source-issues': false,
+  'source-gitlab': false, 'source-wayback': false, 'source-docker': false,
+  'source-commoncrawl': false, 'source-gitee': false, 'source-npm': false,
+  'source-all': false,
+  'github-token': '', 'gitlab-token': '', 'gitee-token': '',
+};
+
+// ═══════════════════════════════════════════
+//  DOM HELPERS
+// ═══════════════════════════════════════════
+
+function $(id) { return document.getElementById(id); }
+function val(id) { return $(id)?.value?.trim?.() || ''; }
+function checked(id) { return $(id)?.checked || false; }
+function num(id) { const v = parseFloat(val(id)); return isNaN(v) ? null : v; }
+function inum(id) { const v = parseInt(val(id)); return isNaN(v) ? null : v; }
+
+// ═══════════════════════════════════════════
+//  UNIVERSAL RADIO GROUP HANDLER
+// ═══════════════════════════════════════════
+
+function setupRadioGroup(groupName, onChangeFn) {
+  const radios = document.querySelectorAll(`input[name="${groupName}"]`);
+  radios.forEach(radio => {
+    radio.addEventListener('change', () => {
+      // Update visual state
+      radios.forEach(r => {
+        const chip = r.closest('.chip') || r.closest('.radio-chip');
+        if (chip) chip.classList.remove('on', 'on-danger', 'on-green');
+      });
+      const activeChip = radio.closest('.chip') || radio.closest('.radio-chip');
+      if (activeChip) {
+        const v = radio.value;
+        activeChip.classList.add(
+          v === 'dry-run' ? 'on-danger' : v === 'resume' ? 'on-green' : 'on'
+        );
+      }
+      if (onChangeFn) onChangeFn(radio.value);
+      generate();
+    });
+  });
+}
+
+// ═══════════════════════════════════════════
+//  UNIVERSAL CHIP (CHECKBOX) HANDLER
+// ═══════════════════════════════════════════
+
+function setupChip(chipId, inputId) {
+  const chip = $(chipId);
+  const input = $(inputId);
+  if (!chip || !input) return;
+
+  function syncVisual() {
+    chip.classList.toggle('on', input.checked);
+    chip.classList.toggle('on-danger', input.checked && (input.value === 'dry-run'));
+    chip.classList.toggle('on-green', input.checked && (input.value === 'resume'));
+  }
+
+  chip.addEventListener('click', function(e) {
+    if (e.target !== input) {
+      input.checked = !input.checked;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  });
+
+  input.addEventListener('change', () => {
+    syncVisual();
+    // Special linkage for use-builtin ↔ skip-builtin
+    if (inputId === 'skip-builtin' && input.checked) {
+      $('use-builtin').checked = false;
+      updateChipVis('chip-builtin', false);
+    }
+    if (inputId === 'use-builtin' && input.checked) {
+      $('skip-builtin').checked = false;
+      updateChipVis('chip-skip', false);
+    }
+    generate();
+  });
+
+  syncVisual();
+}
+
+function updateChipVis(chipId, checked) {
+  const chip = $(chipId);
+  if (!chip) return;
+  chip.classList.toggle('on', checked);
+  chip.classList.toggle('on-green', checked && chipId === 'chip-builtin');
+}
+
+// ═══════════════════════════════════════════
+//  CHIP BINDING
+// ═══════════════════════════════════════════
+
+// ═══════════════════════════════════════════
+//  REGISTER ALL CHIPS + RADIO GROUPS
+// ═══════════════════════════════════════════
+
+// Checkbox chips
+['quiet', 'cmd-gen'].forEach(id => setupChip(`chip-${id}`, id));
+
+// Special chips
+setupChip('chip-builtin', 'use-builtin');
+setupChip('chip-skip', 'skip-builtin');
+
+// Multi-source chips
+['source-github','source-gist','source-issues','source-gitlab','source-wayback',
+ 'source-docker','source-commoncrawl','source-gitee','source-npm'].forEach(id => {
+  setupChip(`chip-src-${id.replace('source-','')}`, id);
+});
+
+// "All" chip handler
+$('chip-src-all').addEventListener('click', function(e) {
+  if (e.target !== $('source-all')) {
+    $('source-all').checked = !$('source-all').checked;
+    $('source-all').dispatchEvent(new Event('change', { bubbles: true }));
+  }
+});
+$('source-all').addEventListener('change', () => {
+  const val = $('source-all').checked;
+  $('chip-src-all').classList.toggle('on', val);
+  ['source-github','source-gist','source-issues','source-gitlab',
+   'source-wayback','source-docker','source-commoncrawl','source-gitee','source-npm'].forEach(id => {
+    const inp = $(id); if (inp) inp.checked = val;
+    updateChipVis(`chip-src-${id.replace('source-','')}`, val);
+  });
+  generate();
+});
+
+// Radio group: run-mode
+setupRadioGroup('run-mode', function(mode) {
+  $('verify-only-field').style.display = (mode === 'verify-only') ? '' : 'none';
+  const notes = {
+    'full': '&#128269;<span><strong>全流程扫描：</strong>搜索 GitHub 公开仓库 → 提取疑似 Key → 并发验证余额 → 按 USD 价值排序保存。</span>',
+    'dry-run': '&#128083;<span><strong>Dry Run：</strong>仅搜索不验证，快速发现哪些仓库暴露了 Key。</span>',
+    'verify-only': '&#9989;<span><strong>仅验证：</strong>跳过搜索，读取已有结果文件重新验证 Key 余额。</span>',
+    'resume': '&#128260;<span><strong>断点续跑：</strong>从进度文件恢复，跳过已完成部分继续扫描。</span>',
+  };
+  $('mode-note').innerHTML = notes[mode] || notes['full'];
+});
+
+// Radio group: format
+setupRadioGroup('format');
+
+// (onModeChange now handled inside setupRadioGroup callback)
+
+// ═══════════════════════════════════════════
+//  TOKEN STATUS
+// ═══════════════════════════════════════════
+
+function checkTokenStatus() {
+  const t = val('token');
+  const st = $('token-status');
+  if (t) {
+    const tokens = t.split(',').filter(Boolean);
+    st.textContent = `已设置 ${tokens.length} 个 Token`;
+    st.className = 'token-status found';
+  } else {
+    st.textContent = '未设置 (使用未认证模式)';
+    st.className = 'token-status missing';
+  }
+}
+
+$('token').addEventListener('input', () => { checkTokenStatus(); generate(); });
+
+// ═══════════════════════════════════════════
+//  LIVE INPUT (all text/number inputs)
+// ═══════════════════════════════════════════
+
+document.querySelectorAll('input[type="text"], input[type="number"], input[type="search"], select').forEach(el => {
+  el.addEventListener('input', generate);
+  el.addEventListener('change', generate);
+})
+
+// Rate display
+$('usd-cny-rate').addEventListener('input', () => {
+  $('rate-display').textContent = val('usd-cny-rate') || '7.25';
+  generate();
+});
+
+// ═══════════════════════════════════════════
+//  COMMAND BUILDER
+// ═══════════════════════════════════════════
+
+let lastCmd = 'python deepseek_key_scanner.py';
+
+function generate() {
+  const parts = ['python deepseek_key_scanner.py'];
+
+  // Token
+  const tokenVal = val('token');
+  const tokenEnvHint = tokenVal ? 'set GITHUB_TOKEN=' + tokenVal.split(',')[0].trim() + ' && ' : '';
+
+  // Exit mechanism
+  const md = inum('max-duration');
+  if (md && md > 0) parts.push(`--max-duration ${md}`);
+  const mvk = inum('max-valid-keys');
+  if (mvk && mvk > 0) parts.push(`--max-valid-keys ${mvk}`);
+  const asi = inum('auto-save-interval');
+  if (asi && asi !== 20 && asi > 0) parts.push(`--auto-save-interval ${asi}`);
+
+  // Search
+  const sp = inum('scan-pages');
+  if (sp && sp !== 5 && sp > 0 && sp <= 10) parts.push('--scan-pages ' + sp);
+  const delay = num('search-delay');
+  if (delay !== null && delay !== 2.5) parts.push(`--search-delay ${delay}`);
+
+  const qf = val('queries-file');
+  if (qf) parts.push(`--queries-file ${qf}`);
+
+  if (checked('skip-builtin')) parts.push('--skip-builtin');
+
+  // Concurrency & timeout
+  const cc = inum('concurrency');
+  if (cc !== null && cc !== 20) parts.push(`-c ${cc}`);
+  const to = inum('timeout');
+  if (to !== null && to !== 15) parts.push(`--timeout ${to}`);
+
+  // Run mode
+  const mode = document.querySelector('input[name="run-mode"]:checked')?.value || 'full';
+  if (mode === 'dry-run') parts.push('--dry-run');
+  else if (mode === 'resume') parts.push('--resume');
+  else if (mode === 'verify-only') {
+    const vp = val('verify-only');
+    parts.push(vp ? `--verify-only ${vp}` : '--verify-only <FILE>');
+  }
+
+  // Multi-source
+  const srcAll = checked('source-all');
+  if (srcAll) {
+    parts.push('--sources all');
+  } else {
+    const srcs = [];
+    if (checked('source-github')) srcs.push('github');
+    if (checked('source-gist')) srcs.push('gist');
+    if (checked('source-issues')) srcs.push('issues');
+    if (checked('source-gitlab')) srcs.push('gitlab');
+    if (checked('source-wayback')) srcs.push('wayback');
+    if (checked('source-docker')) srcs.push('docker');
+    if (checked('source-commoncrawl')) srcs.push('commoncrawl');
+    if (checked('source-gitee')) srcs.push('gitee');
+    if (checked('source-npm')) srcs.push('npm');
+    if (srcs.length > 0 && srcs.length < 9 && !checked('source-github')) {
+      parts.push(`--sources ${srcs.join(',')}`);
+    }
+  }
+
+  // Tokens
+  const ghToken = val('github-token');
+  if (ghToken) parts.push(`--github-token ${ghToken}`);
+  const glToken = val('gitlab-token');
+  if (glToken) parts.push(`--gitlab-token ${glToken}`);
+  const gtToken = val('gitee-token');
+  if (gtToken) parts.push(`--gitee-token ${gtToken}`);
+
+  // Filter
+  const minLen = inum('min-key-length');
+  if (minLen !== null && minLen !== 32) parts.push(`--min-key-length ${minLen}`);
+  const maxLen = inum('max-key-length');
+  if (maxLen !== null && maxLen !== 64) parts.push(`--max-key-length ${maxLen}`);
+  const minBal = num('min-balance');
+  if (minBal !== null && minBal > 0) parts.push(`--min-balance ${minBal}`);
+
+  const exclude = val('exclude-repo');
+  if (exclude) {
+    exclude.split(',').map(s => s.trim()).filter(Boolean).forEach(r => parts.push(`--exclude-repo ${r}`));
+  }
+
+  const rate = num('usd-cny-rate');
+  if (rate !== null && rate !== 7.25) parts.push(`--usd-cny-rate ${rate}`);
+
+  // Output
+  const od = val('output-dir');
+  if (od && od !== './results') parts.push(`--output-dir ${od}`);
+
+  const fmt = document.querySelector('input[name="format"]:checked')?.value || 'all';
+  if (fmt !== 'all') parts.push(`--format ${fmt}`);
+
+  // Other
+  if (checked('quiet')) parts.push('-q');
+  if (checked('cmd-gen')) parts.push('--cmd-gen');
+
+  const extra = val('extra-args');
+  if (extra) parts.push(extra);
+
+  // Build & beautify
+  const plainCmd = parts.join(' ');
+  const html = parts.map((p, i) => {
+    if (i === 0) return `<span class="kw">${p}</span>`;
+    if (p === '-q' || p === '--gui' || p === '--cmd-gen' || p === '--skip-builtin' || p === '--dry-run' || p === '--resume')
+      return `<span class="fl">${p}</span>`;
+    if (p.startsWith('-c ')) return `<span class="fl">${p.split(' ')[0]}</span> <span class="vl">${p.slice(3)}</span>`;
+    if (p.startsWith('--')) {
+      const spaceIdx = p.indexOf(' ');
+      if (spaceIdx === -1) return `<span class="fl">${p}</span>`;
+      return `<span class="fl">${p.slice(0, spaceIdx)}</span> <span class="vl">${p.slice(spaceIdx+1)}</span>`;
+    }
+    return `<span class="vl">${p}</span>`;
+  }).join(' ');
+
+  $('cmd-box').innerHTML = html || '<span style="color:var(--text-dim)">python deepseek_key_scanner.py</span>';
+
+  // Token env prefix
+  if (tokenEnvHint) {
+    $('cmd-box').innerHTML = `<span class="cm"># 先设置环境变量 (或使用 --token 仅本次)</span>\n`
+      + `<span class="kw">${tokenEnvHint.trimEnd()}</span>\n`
+      + $('cmd-box').innerHTML;
+  }
+
+  lastCmd = (tokenEnvHint ? tokenEnvHint : '') + plainCmd;
+}
+
+// ═══════════════════════════════════════════
+//  COPY
+// ═══════════════════════════════════════════
+
+function copyCmd() {
+  const text = lastCmd;
+  if (!navigator.clipboard) {
+    fallbackCopy(text);
+    return;
+  }
+  navigator.clipboard.writeText(text).then(() => toast('&#10003; 命令已复制到剪贴板'), () => fallbackCopy(text));
+}
+
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); toast('&#10003; 已复制'); } catch (e) { toast('&#10007; 复制失败，请手动选择', true); }
+  document.body.removeChild(ta);
+}
+
+// ═══════════════════════════════════════════
+//  DOWNLOAD .bat
+// ═══════════════════════════════════════════
+
+function downloadCmd() {
+  const text = lastCmd;
+  const blob = new Blob(['@echo off\n' + text + '\npause\n'], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'run_scanner.bat';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('&#128190; 已下载 run_scanner.bat');
+}
+
+// ═══════════════════════════════════════════
+//  TOAST
+// ═══════════════════════════════════════════
+
+let toastTimer;
+function toast(msg, isErr) {
+  const el = $('toast');
+  el.innerHTML = msg;
+  el.className = 'toast show' + (isErr ? ' err' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2000);
+}
+
+// ═══════════════════════════════════════════
+//  RESET
+// ═══════════════════════════════════════════
+
+function resetAll() {
+  Object.entries(DEFAULTS).forEach(([k, v]) => {
+    const el = $(k);
+    if (!el) return;
+    if (el.type === 'checkbox' || el.type === 'radio') el.checked = v;
+    else if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') el.value = v;
+  });
+  // Reset chip visuals
+  document.querySelectorAll('.chip').forEach(ch => {
+    ch.classList.remove('on', 'on-danger', 'on-green');
+  });
+  document.querySelectorAll('.radio-chip').forEach(ch => ch.classList.remove('on'));
+  // Restore defaults
+  $('chip-builtin').classList.add('on-green');
+  document.querySelector('#chip-fullscan')?.classList.add('on');
+  $('verify-only-field').style.display = 'none';
+  document.querySelector('input[name="run-mode"][value="full"]').checked = true;
+  document.querySelector('input[name="format"][value="all"]').checked = true;
+  document.querySelector('.radio-chip[data-value="all"]')?.classList.add('on');
+  checkTokenStatus();
+  generate();
+  toast('&#8634; 已重置为默认值');
+}
+
+// ═══════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════
+
+function init() {
+  Object.entries(DEFAULTS).forEach(([k, v]) => {
+    const el = $(k);
+    if (!el) return;
+    if (el.type === 'checkbox' || el.type === 'radio') el.checked = v;
+    else if (el.tagName === 'INPUT') el.value = v;
+  });
+  // Init visuals
+  $('chip-builtin').classList.add('on-green');
+  document.querySelector('#chip-fullscan')?.classList.add('on');
+  document.querySelector('.radio-chip[data-value="all"]')?.classList.add('on');
+  $('verify-only-field').style.display = 'none';
+  checkTokenStatus();
+
+  // Build nav dots
+  const sections = document.querySelectorAll('.section');
+  const nav = $('nav-dots');
+  sections.forEach((sec, i) => {
+    const a = document.createElement('a');
+    a.href = '#' + sec.id;
+    a.title = sec.querySelector('.section-title')?.textContent?.trim() || '';
+    a.addEventListener('click', e => {
+      e.preventDefault();
+      sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    nav.appendChild(a);
+  });
+
+  // IntersectionObserver for nav dots
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        document.querySelectorAll('.nav-dots a').forEach((a, i) => {
+          a.classList.toggle('active', a.getAttribute('href') === '#' + entry.target.id);
+        });
+      }
+    });
+  }, { threshold: 0.3 });
+  sections.forEach(s => observer.observe(s));
+
+  // Generate initial command
+  generate();
+}
+
+init();
+</script>
+</body>
+</html>

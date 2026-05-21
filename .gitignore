@@ -1,0 +1,30 @@
+# Sensitive results — NEVER commit API keys
+results/
+results/*
+*.json.bak
+*.csv.bak
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Claude
+.claude/
+
+# Temp scripts
+_*.py
