@@ -1098,9 +1098,8 @@ class ScannerEngine:
         async def _do():
             nonlocal discovered
             if source == "github":
-                if not queries:
-                    queries = BUILTIN_QUERIES
-                for query in queries[:50]:
+                qs = queries or BUILTIN_QUERIES
+                for query in qs[:50]:
                     if self._should_stop():
                         break
                     batch = self._scan_one_query(query)
