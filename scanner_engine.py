@@ -778,6 +778,38 @@ class ScannerEngine:
     #  每轮 = 一条查询, 边扫边验边存, 时间/数量达标立即退出
     # ================================================================
 
+    # Provider keywords for query filtering
+    _PROVIDER_KW = {
+        "deepseek": ["deepseek", "api.deepseek.com", "ds_api_key", "ds_key",
+                     "DEEPSEEK_API_KEY", "DEEPSEEK_KEY", "DEEPSEEK_TOKEN", "DEEPSEEK_API_TOKEN"],
+        "openai": ["openai", "api.openai.com", "OPENAI_API_KEY", "OPENAI_KEY", "OPENAI_TOKEN"],
+        "openrouter": ["openrouter", "openrouter.ai", "OPENROUTER_API_KEY", "OPENROUTER_KEY"],
+    }
+
+    def _filter_queries_for_providers(self, queries: list) -> list:
+        """Filter search queries to only those relevant to active providers.
+        Generic sk- queries (no provider keyword, or only in NOT clauses) are always kept."""
+        if set(self.providers) >= {"deepseek", "openai", "openrouter"}:
+            return list(queries)  # all providers → no filtering
+
+        import re
+        filtered = []
+        for q in queries:
+            q_lower = q.lower()
+            # Which providers does this query mention (outside NOT clauses)?
+            # Remove NOT clauses before checking
+            cleaned = re.sub(r'\bnot\s+\S+', '', q_lower, flags=re.IGNORECASE)
+            mentioned = set()
+            for prov, keywords in self._PROVIDER_KW.items():
+                for kw in keywords:
+                    if kw.lower() in cleaned:
+                        mentioned.add(prov)
+                        break
+            # Keep if: generic (no provider mention) OR mentions at least one active provider
+            if not mentioned or (mentioned & set(self.providers)):
+                filtered.append(q)
+        return filtered
+
     def run(self, queries: list) -> list:
         """主流水线: 逐条查询, 搜索→验证→保存→检查限制→循环
         支持 Ctrl+C 优雅退出: 保存进度, 验证已扫 Key, 保存结果
@@ -792,11 +824,12 @@ class ScannerEngine:
         os.makedirs(self.output_dir, exist_ok=True)
         self._start_time = time.time()
 
-        # 按热度顺序扫描 (热→冷, 前期快速产出)
-        ordered = queries.copy()
+        # Filter queries by active providers, then sort by heat
+        ordered = self._filter_queries_for_providers(queries)
+        skipped = len(queries) - len(ordered)
 
-        self.log(f"流水线启动: {len(queries)} 条查询 (热度排序), 并发 {self.concurrency}, "
-                 f"时长限制 {self.max_duration}s, 目标 {self.max_valid_keys} 个有效Key")
+        self.log(f"流水线启动: {len(queries)} 条查询 → 过滤后 {len(ordered)} 条 (跳过 {skipped} 条不相关), "
+                 f"并发 {self.concurrency}, 时长限制 {self.max_duration}s, 目标 {self.max_valid_keys} 个有效Key")
 
         try:
             for qi, query in enumerate(ordered):
