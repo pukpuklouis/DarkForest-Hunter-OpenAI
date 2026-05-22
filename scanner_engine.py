@@ -987,7 +987,7 @@ class ScannerEngine:
         self._start_time = time.time()
 
         scanner_map = {
-            "github": ("GitHub Code Search", queries or BUILTIN_QUERIES),
+            "github": ("GitHub Code Search", self._filter_queries_for_providers(queries or BUILTIN_QUERIES)),
             "gist": ("GitHub Gists", None),
             "issues": ("GitHub Issues/PRs", None),
             "commits": ("GitHub Commit History", None),
