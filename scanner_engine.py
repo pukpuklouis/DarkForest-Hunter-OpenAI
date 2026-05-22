@@ -41,7 +41,7 @@ if sys.platform == "win32":
 # 默认汇率（1 USD = ? CNY）
 DEFAULT_USD_CNY_RATE = 7.25
 
-KEY_PATTERN = re.compile(r"sk-[a-zA-Z0-9]{32,64}")
+KEY_PATTERN = re.compile(r"sk-[a-zA-Z0-9]{32,100}")
 
 # ═══════════════════════════════════════════════════════════════════
 #  Multi-Provider Verification — Try each provider until one matches
@@ -59,13 +59,13 @@ PROVIDER_CONFIGS = [
         "display": "OpenAI",
         "base": "https://api.openai.com",
         "balance_url": "/v1/models",
-        "credit_url": "/dashboard/billing/credit_grants",
     },
     {
         "name": "openrouter",
         "display": "OpenRouter",
         "base": "https://openrouter.ai/api/v1",
-        "balance_url": "/auth/key",
+        "balance_url": "/key",
+        "credit_url": "/credits",
     },
 ]
 
@@ -91,10 +91,13 @@ def _parse_deepseek_balance(data: dict) -> dict:
 
 
 def _parse_openai_models(data: dict) -> dict:
-    """Parse OpenAI /v1/models — valid key confirmed, no balance."""
+    """Parse OpenAI /v1/models — confirms key validity (official method).
+    OpenAI no longer exposes balance/credits via public API.
+    For billing info, use https://platform.openai.com/settings/organization/billing/credit-grants"""
     if data.get("object") == "list" and "data" in data:
         return {"valid": True, "total_balance": 0.0, "balance_details": [],
-                "primary_currency": "USD", "balance_unavailable": True}
+                "primary_currency": "USD", "balance_unavailable": True,
+                "provider_note": "Valid key (balance not available via API — check Platform Billing)"}
     return {"valid": False, "reason": "unexpected_response"}
 
 
@@ -109,10 +112,24 @@ def _parse_openai_credits(data: dict) -> dict:
 
 
 def _parse_openrouter_balance(data: dict) -> dict:
-    """Parse OpenRouter /auth/key response."""
-    credits = float(data.get("data", {}).get("credits", 0))
-    return {"valid": True, "total_balance": credits, "balance_details": [],
-            "primary_currency": "USD"}
+    """Parse OpenRouter /key response — confirms key validity, balance comes from /credits."""
+    key_data = data.get("data", {})
+    if key_data:
+        return {"valid": True, "total_balance": 0.0, "balance_details": [],
+                "primary_currency": "USD", "balance_unavailable": True,
+                "provider_note": f"limit={key_data.get('limit', '?')}, usage={key_data.get('usage', 0)}"}
+    return {"valid": False, "reason": "unexpected_response"}
+
+
+def _parse_openrouter_credits(data: dict) -> dict:
+    """Parse OpenRouter /credits response."""
+    credits_data = data.get("data", {})
+    total_credits = float(credits_data.get("total_credits", 0))
+    total_usage = float(credits_data.get("total_usage", 0))
+    balance = total_credits - total_usage
+    return {"valid": True, "total_balance": balance, "balance_details": [],
+            "primary_currency": "USD",
+            "openrouter_credits": {"total_credits": total_credits, "total_usage": total_usage}}
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -667,7 +684,7 @@ class ScannerEngine:
                  search_delay: float = 2.5,
                  max_pages: int = 3,
                  min_key_length: int = 32,
-                 max_key_length: int = 64,
+                 max_key_length: int = 100,
                  output_dir: str = ".",
                  providers: list = None,
                  deepseek_api_base: str = None,  # deprecated, use providers
@@ -1418,9 +1435,14 @@ class ScannerEngine:
                 if resp.status == 200:
                     data = await resp.json()
                     result = self._parse_provider_response(name, data)
-                    # For OpenAI: try credit_grants to get actual balance
-                    if name == "openai" and provider.get("credit_url"):
-                        balance = await self._try_openai_credits(session, api_key, provider)
+                    # For OpenAI / OpenRouter: try credit endpoint to get actual balance
+                    if provider.get("credit_url"):
+                        if name == "openai":
+                            balance = await self._try_openai_credits(session, api_key, provider)
+                        elif name == "openrouter":
+                            balance = await self._try_openrouter_credits(session, api_key, provider)
+                        else:
+                            balance = None
                         if balance is not None:
                             result.update(balance)
                     return result
@@ -1457,13 +1479,33 @@ class ScannerEngine:
             pass
         return None
 
+    async def _try_openrouter_credits(self, session: aiohttp.ClientSession,
+                                       api_key: str, provider: dict):
+        """Try OpenRouter /credits endpoint to get actual balance.
+        Returns balance dict or None if endpoint is unavailable."""
+        url = f"{provider['base']}{provider['credit_url']}"
+        headers = {"Authorization": f"Bearer {api_key}"}
+        try:
+            async with session.get(url, headers=headers,
+                                    timeout=aiohttp.ClientTimeout(total=8)) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    parsed = _parse_openrouter_credits(data)
+                    return {"total_balance": parsed["total_balance"],
+                            "primary_currency": parsed["primary_currency"],
+                            "openrouter_credits": parsed.get("openrouter_credits"),
+                            "balance_unavailable": False,
+                            "provider_note": ""}
+        except Exception:
+            pass
+        return None
+
     def _parse_provider_response(self, provider_name: str, data: dict) -> dict:
         """Parse balance response based on provider name."""
         if provider_name == "deepseek":
             result = _parse_deepseek_balance(data)
         elif provider_name == "openai":
             result = _parse_openai_models(data)
-            result["provider_note"] = "Valid key (balance requires billing scope)"
         elif provider_name == "openrouter":
             result = _parse_openrouter_balance(data)
         else:
