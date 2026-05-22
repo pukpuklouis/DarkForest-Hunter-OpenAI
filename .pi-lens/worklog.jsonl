@@ -1,0 +1,1 @@
+{"timestamp":"2026-05-22T04:58:08.285Z","filePath":"/Users/pukpuk/Dev/DarkForest-Hunter-OpenAI/scanner_engine.py","rule":"python-print-statement","tool":"tree-sitter","message":"print() — remove debug output before committing","line":718,"column":73,"fixable":true,"fixSuggestion":"remove this statement","autoFixed":false}

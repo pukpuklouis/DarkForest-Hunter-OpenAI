@@ -1,0 +1,4 @@
+{
+  "signature": "api_key_hunter.py::Unresolved from this turn — api_key_hunter.py:\n🔴 STOP — 1 issue(s) must be fixed:\n  Cannot assign to attribute \"on_key_found\" for class \"EventsMonitor\"\n    Expression of type \"(k: Unknown, repo: Unknown, fpath: Unknown, url: Unknown) -> None\" cannot be assigned to attribute \"on_key_found\" of class \"EventsMonitor\"\n      \"FunctionType\" is not assignable to \"None\"",
+  "sessionId": "lens-mpgfvtls-663c4b11"
+}

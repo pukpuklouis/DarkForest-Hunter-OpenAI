@@ -67,6 +67,12 @@ PROVIDER_CONFIGS = [
         "balance_url": "/key",
         "credit_url": "/credits",
     },
+    {
+        "name": "opencode",
+        "display": "OpenCode Zen",
+        "base": "https://opencode.ai",
+        "balance_url": "/zen/v1/models",
+    },
 ]
 
 
@@ -658,6 +664,46 @@ BUILTIN_QUERIES = [
     "sk- filename:ipynb NOT deepseek",
     "sk- filename:sh NOT deepseek",
     "sk- filename:bash NOT deepseek",
+
+    # ═══════════════════════════════════════════════════════
+    #  第十七梯队 — OpenCode Zen (opencode.ai)
+    # ═══════════════════════════════════════════════════════
+
+    # OpenCode Zen API key patterns
+    "OPENCODE_API_KEY sk-",
+    "OPENCODE_KEY sk-",
+    "opencode_api_key sk- filename:py",
+    "opencode_api_key sk- filename:js",
+    "opencode_api_key sk- filename:ts",
+    "opencode_api_key sk- filename:env",
+    "opencode sk- api_key filename:py",
+    "opencode sk- api_key filename:js",
+    "opencode sk- filename:env",
+    "opencode.ai sk- filename:py",
+    "opencode.ai sk- filename:js",
+    "opencode zen sk- filename:env",
+    "opencode zen sk- filename:py",
+    "opencode zen sk- filename:js",
+    "zen/v1 sk- filename:py",
+    "zen/v1 sk- filename:js",
+    "zen/v1 sk- filename:env",
+    "opencode openai_api_key sk- filename:env",
+    "opencode openai_api_key sk- filename:py",
+    "opencode API_KEY sk- filename:env",
+    "opencode API_KEY sk- path:config",
+    "opencode api key sk- filename:md",
+    "opencode connect sk- filename:py",
+    "opencode connect sk- filename:js",
+    "opencode config sk-",
+    "OPENCODE_API_KEY path:.github/workflows",
+
+    # OpenCode Zen in AI framework configs
+    "langchain opencode api_key",
+    "litellm opencode api_key",
+    "opencode sk- filename:json",
+    "opencode sk- filename:yml",
+    "opencode sk- filename:toml",
+    "opencode sk- filename:dockerfile",
 ]
 
 
@@ -784,12 +830,13 @@ class ScannerEngine:
                      "DEEPSEEK_API_KEY", "DEEPSEEK_KEY", "DEEPSEEK_TOKEN", "DEEPSEEK_API_TOKEN"],
         "openai": ["openai", "api.openai.com", "OPENAI_API_KEY", "OPENAI_KEY", "OPENAI_TOKEN"],
         "openrouter": ["openrouter", "openrouter.ai", "OPENROUTER_API_KEY", "OPENROUTER_KEY"],
+        "opencode": ["opencode", "opencode.ai", "OPENCODE_API_KEY", "OPENCODE_KEY", "opencode zen"],
     }
 
     def _filter_queries_for_providers(self, queries: list) -> list:
         """Filter search queries to only those relevant to active providers.
         Generic sk- queries (no provider keyword, or only in NOT clauses) are always kept."""
-        if set(self.providers) >= {"deepseek", "openai", "openrouter"}:
+        if set(self.providers) >= {"deepseek", "openai", "openrouter", "opencode"}:
             return list(queries)  # all providers → no filtering
 
         import re
@@ -1541,6 +1588,9 @@ class ScannerEngine:
             result = _parse_openai_models(data)
         elif provider_name == "openrouter":
             result = _parse_openrouter_balance(data)
+        elif provider_name == "opencode":
+            result = _parse_openai_models(data)  # Same OpenAI-compatible /models response
+            result["provider_note"] = "Valid key (balance not available via API)"
         else:
             result = {"valid": False, "reason": "unknown_provider"}
         result["provider"] = provider_name

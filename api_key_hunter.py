@@ -29,7 +29,7 @@ if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-ALL_PROVIDERS = [p["name"] for p in PROVIDER_CONFIGS]
+ALL_PROVIDERS = [p["name"] for p in PROVIDER_CONFIGS]  # deepseek, openai, openrouter, opencode
 
 
 def build_parser():
@@ -55,6 +55,7 @@ def build_parser():
   deepseek  - DeepSeek API (api.deepseek.com)
   openai    - OpenAI API (api.openai.com)
   openrouter - OpenRouter API (openrouter.ai)
+  opencode   - OpenCode Zen (opencode.ai)
         """,
     )
 
